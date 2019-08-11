@@ -26,7 +26,7 @@ import io.swagger.annotations.SwaggerDefinition;
         description = "A proxy for requesting data from moodle",
         contact = @Contact(
             name = "Philipp Roytburg",
-            email = "philipp.roytburg@rwth-aachen.de")
+            email = "philipp.roytburg@rwth-aachen.de")))
 
 /**
  * 
