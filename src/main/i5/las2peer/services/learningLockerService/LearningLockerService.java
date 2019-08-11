@@ -40,7 +40,7 @@ public class LearningLockerService extends Service {
     private String lrsDomain; // Learning Locker Domain
     private String lrsAuth; // Learning Locker Authentication
     
-    private static ArrayList<String> oldstatements = new ArrayList<String>();
+    private ArrayList<String> oldstatements = new ArrayList<String>();
     
     public LearningLockerService(){
         setFieldValues();
@@ -72,6 +72,11 @@ public class LearningLockerService extends Service {
                     OutputStream os = conn.getOutputStream();
                     os.write(statement.getBytes("UTF-8"));
                     os.flush();
+
+                    Reader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    
+                    for (int c; (c = reader.read()) >= 0;)
+                        System.out.print((char)c);
                     
                     conn.disconnect();
                 } catch (MalformedURLException e) {
