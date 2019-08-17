@@ -44,7 +44,7 @@ docker build . -t learning-locker
 Then you can run the image like this:
 
 ```bash
-docker run -e LRS_DOMAIN=lrsDomain -e LRS_AUTH=lrsAuth -p 9011:port learning-locker
+docker run -e LRS_DOMAIN=lrsDomain -e LRS_AUTH=lrsAuth -p port:9011 learning-locker
 ```
 
 Replace *lrsDomain* with the domain of your LRS and *lrsAuth* with the corresponding authentication and *port* with a free port in your network.
@@ -59,4 +59,3 @@ The las2peer port is fixed at *9011*.
 | BOOTSTRAP | unset | Set the --bootstrap option to bootstrap with existing nodes. The container will wait for any bootstrap node to be available before continuing. |
 | SERVICE_PASSPHRASE | Passphrase | Set the second argument in *startService('<service@version>', '<SERVICE_PASSPHRASE>')*. |
 
-*Do not forget to persist you database data*
