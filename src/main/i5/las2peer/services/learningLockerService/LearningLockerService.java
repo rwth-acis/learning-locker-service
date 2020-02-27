@@ -9,18 +9,16 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.Contact;
 import io.swagger.annotations.Info;
 import io.swagger.annotations.SwaggerDefinition;
-import net.minidev.json.JSONValue;
-import net.minidev.json.parser.ParseException;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
+import net.minidev.json.JSONValue;
+import net.minidev.json.parser.ParseException;
 
-import javax.print.DocFlavor;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
-import java.nio.Buffer;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -49,6 +47,7 @@ public class LearningLockerService extends Service {
     private String clientKey;
     private String clientSecret;
     private String lrsAdminId;
+    private String lrsClientUrl;
     private ArrayList<String> clientList = new ArrayList<>();
 
     
@@ -66,15 +65,13 @@ public class LearningLockerService extends Service {
      */
     public void sendXAPIstatement(ArrayList<String> statements ) throws IOException, ParseException {
         String lrsAuth = "";
-//        String usertoken = extractTokenFromStatements(statements);
-
-
         for(String statement : statements) {
             if(!oldstatements.contains(statement)) {
                 oldstatements.add(statement);
                 String token = statement.split("\\*")[1];
                 String xAPIStatement  = statement.split("\\*")[0];
 
+                //Checks if the client exists
                 Object clientId =  searchIfIncomingClientExists(token);
                 if(!(clientId).equals("newClient")) {
                     clientKey = (String) ((JSONObject) clientId).get("basic_key");
@@ -127,7 +124,7 @@ public class LearningLockerService extends Service {
         String storeId = "";
         URL url = null;
         try {
-            String clientURL = "http://aca518ec.ngrok.io/api/v2/client/" + lrsAdminId;
+            String clientURL = lrsClientUrl + lrsAdminId;
             url = new URL(clientURL);
             HttpURLConnection conn = null;
             conn = (HttpURLConnection) url.openConnection();
@@ -165,7 +162,7 @@ public class LearningLockerService extends Service {
         String storeId = "";
         URL url = null;
         try {
-            String clientURL = "http://aca518ec.ngrok.io/api/v2/client/";
+            String clientURL = lrsClientUrl;
             url = new URL(clientURL);
             HttpURLConnection conn = null;
             conn = (HttpURLConnection) url.openConnection();
@@ -204,7 +201,7 @@ public class LearningLockerService extends Service {
     private Object createNewClient(String moodleToken, String storeId)  {
         URL url = null;
         try {
-            url = new URL("http://aca518ec.ngrok.io/api/v2/client");
+            url = new URL(lrsClientUrl);
 
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setDoOutput(true);
@@ -254,51 +251,4 @@ public class LearningLockerService extends Service {
         }
         return "" ;
     }
-
-    private String extractTokenFromStatements(ArrayList<String> statements) {
-        String token = "";
-        if(statements != null ) {
-         String firstStatement = statements.get(0);
-        }
-        return token;
-    }
-   /* public static void main(String args[]) throws IOException, ParseException {
-        LearningLockerService lls  = new LearningLockerService();
-        ArrayList<String> statements  = new ArrayList<>();
-        statements.add("{\n" +
-                "        \"userToken\": \"cc1d01f1a71ebf088246ec7bb3332e2c\",\n" +
-                "    \"actor\": {\n" +
-                "        \"mbox\": \"mailto:sana.jamal@rwth-aachen.de\",\n" +
-                "        \"name\": \"Sana Jamal\",\n" +
-                "        \"objectType\": \"Agent\"\n" +
-                "    },\n" +
-                "    \"verb\": {\n" +
-                "        \"id\": \"http://adlnet.gov/expapi/verbs/completed\",\n" +
-                "        \"display\": {\n" +
-                "            \"en-US\": \"completed\"\n" +
-                "        }\n" +
-                "    },\n" +
-                "    \"object\": {\n" +
-                "        \"id\": \"http://adlnet.gov/expapi/activities/example\",\n" +
-                "        \"definition\": {\n" +
-                "            \"name\": {\n" +
-                "                \"en-US\": \"Quiz 1.a\"\n" +
-                "            }\n" +
-                "        },\n" +
-                "        \"objectType\": \"Activity\"\n" +
-                "    },\n" +
-                "    \"result\": {\n" +
-                "        \"score\": {\n" +
-                "            \"scaled\": 0.9,\n" +
-                "            \"raw\": 90,\n" +
-                "            \"min\": 0,\n" +
-                "            \"max\": 100\n" +
-                "        },\n" +
-                "        \"success\": true,\n" +
-                "        \"completion\": true,\n" +
-                "        \"duration\": \"P159D\"\n" +
-                "    }\n" +
-                "}");
-        lls.sendXAPIstatement(statements);
-    }*/
 }
