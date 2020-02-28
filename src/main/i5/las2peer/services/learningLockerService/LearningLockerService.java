@@ -12,7 +12,6 @@ import io.swagger.annotations.SwaggerDefinition;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
-import net.minidev.json.parser.ParseException;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -27,7 +26,7 @@ import java.util.List;
 @SwaggerDefinition(
     info = @Info(
         title = "Moodle Data Proxy Service",
-        version = "1.0",
+        version = "1.0.0",
         description = "A proxy for requesting data from moodle",
         contact = @Contact(
             name = "Philipp Roytburg",
@@ -44,14 +43,10 @@ public class LearningLockerService extends Service {
     
     private String lrsDomain; // Learning Locker Domain
     private String adminLrsAuth; // Learning Locker Authentication
-    private String clientKey;
-    private String clientSecret;
-    private String lrsAdminId;
-    private String lrsClientUrl;
-    private ArrayList<String> clientList = new ArrayList<>();
-
-    
-    private ArrayList<String> oldstatements = new ArrayList<String>();
+    private String lrsClientId; // 
+    //private ArrayList<String> clientList = new ArrayList<>();
+    private final static String statementsEndpoint = "/data/xAPI/statements";
+    private final static String clientEndpoint = "/api/v2/client/";
     
     public LearningLockerService(){
         setFieldValues();
@@ -61,59 +56,56 @@ public class LearningLockerService extends Service {
      * A function that is called by the user to send processed moodle to a mobsos data processing instance. 
      *
      * @param statements is an ArrayList of xAPI statements that are sent to the defined Learning Locker instance.
-     * 
+     * @throws IOException if any I/O Exception occurs.
      */
-    public void sendXAPIstatement(ArrayList<String> statements ) throws IOException, ParseException {
+    public void sendXAPIstatement(ArrayList<String> statements ) throws IOException {
         String lrsAuth = "";
         for(String statement : statements) {
-            if(!oldstatements.contains(statement)) {
-                oldstatements.add(statement);
-                String token = statement.split("\\*")[1];
-                String xAPIStatement  = statement.split("\\*")[0];
+            String token = statement.split("\\*")[1];
+            String xAPIStatement  = statement.split("\\*")[0];
 
-                //Checks if the client exists
-                Object clientId =  searchIfIncomingClientExists(token);
-                if(!(clientId).equals("newClient")) {
-                    clientKey = (String) ((JSONObject) clientId).get("basic_key");
-                    clientSecret = (String) ((JSONObject) clientId).get("basic_secret");
-                    lrsAuth = Base64.getEncoder().encodeToString((clientKey+ ":" + clientSecret).getBytes());
-                } else {
-                    String storeId = getStoreIdOfAdmin();
-                    Object newlyCreatedClient = createNewClient(token, storeId);
-                    clientKey = (String) ((JSONObject) newlyCreatedClient).get("basic_key");
-                    clientSecret = (String) ((JSONObject) newlyCreatedClient).get("basic_secret");
-                    lrsAuth = Base64.getEncoder().encodeToString((clientKey+ ":" + clientSecret).getBytes());
-                }
-
-                try {
-                    URL url = new URL(lrsDomain);
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                    conn.setDoOutput(true);
-                    conn.setDoInput(true);
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                    conn.setRequestProperty("X-Experience-API-Version","1.0.3");
-                    conn.setRequestProperty("Authorization", "Basic " + lrsAuth);
-                    conn.setRequestProperty("Cache-Control", "no-cache");
-                    conn.setUseCaches(false);
-                    
-                    OutputStream os = conn.getOutputStream();
-                    os.write(xAPIStatement.getBytes("UTF-8"));
-                    os.flush();
-
-                    Reader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                    
-                    for (int c; (c = reader.read()) >= 0;)
-                        System.out.print((char)c);
-                    
-                    conn.disconnect();
-                } catch (MalformedURLException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+            //Checks if the client exists
+            Object clientId =  searchIfIncomingClientExists(token);
+            
+            if(!(clientId).equals("newClient")) {
+            	String clientKey = (String) ((JSONObject) clientId).get("basic_key");
+            	String clientSecret = (String) ((JSONObject) clientId).get("basic_secret");
+                lrsAuth = Base64.getEncoder().encodeToString((clientKey+ ":" + clientSecret).getBytes());
+            } else {
+                String storeId = getStoreIdOfAdmin();
+                Object newlyCreatedClient = createNewClient(token, storeId);
+                String clientKey = (String) ((JSONObject) newlyCreatedClient).get("basic_key");
+                String clientSecret = (String) ((JSONObject) newlyCreatedClient).get("basic_secret");
+                lrsAuth = Base64.getEncoder().encodeToString((clientKey+ ":" + clientSecret).getBytes());
             }
 
+            try {
+                URL url = new URL(lrsDomain+statementsEndpoint);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setDoOutput(true);
+                conn.setDoInput(true);
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                conn.setRequestProperty("X-Experience-API-Version","1.0.3");
+                conn.setRequestProperty("Authorization", "Basic " + lrsAuth);
+                conn.setRequestProperty("Cache-Control", "no-cache");
+                conn.setUseCaches(false);
+                
+                OutputStream os = conn.getOutputStream();
+                os.write(xAPIStatement.getBytes("UTF-8"));
+                os.flush();
+
+                Reader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                
+                for (int c; (c = reader.read()) >= 0;)
+                    System.out.print((char)c);
+                
+                conn.disconnect();
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -124,7 +116,7 @@ public class LearningLockerService extends Service {
         String storeId = "";
         URL url = null;
         try {
-            String clientURL = lrsClientUrl + lrsAdminId;
+            String clientURL = lrsDomain + clientEndpoint + lrsClientId;
             url = new URL(clientURL);
             HttpURLConnection conn = null;
             conn = (HttpURLConnection) url.openConnection();
@@ -158,11 +150,11 @@ public class LearningLockerService extends Service {
         return storeId;
     }
 
-    private Object searchIfIncomingClientExists(String moodleToken) throws IOException, ParseException {
+    private Object searchIfIncomingClientExists(String moodleToken) throws IOException {
         String storeId = "";
         URL url = null;
         try {
-            String clientURL = lrsClientUrl;
+            String clientURL = lrsDomain + clientEndpoint;
             url = new URL(clientURL);
             HttpURLConnection conn = null;
             conn = (HttpURLConnection) url.openConnection();
@@ -201,7 +193,7 @@ public class LearningLockerService extends Service {
     private Object createNewClient(String moodleToken, String storeId)  {
         URL url = null;
         try {
-            url = new URL(lrsClientUrl);
+            url = new URL(lrsDomain + clientEndpoint);
 
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setDoOutput(true);
