@@ -18,6 +18,7 @@ To set up the service configure the [property file](etc/i5.las2peer.services.lea
 ```INI
 lrsDomain = http://exampleDomain/data/xAPI/statements
 lrsAuth = exampleAuth
+lrsAdminId = AdminClientID
 ```
 
 Build
@@ -47,7 +48,7 @@ Then you can run the image like this:
 docker run -e LRS_DOMAIN=lrsDomain -e LRS_AUTH=lrsAuth -p port:9011 learning-locker
 ```
 
-Replace *lrsDomain* with the domain of your LRS and *lrsAuth* with the corresponding authentication and *port* with a free port in your network.
+Replace *lrsDomain* with the domain of your LRS, *lrsAuth* with the corresponding authentication, lrsAdminId with the client ID of the admin (Stored in LRS) and *port* with a free port in your network.
 
 ### Node Launcher Variables
 
