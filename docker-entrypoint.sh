@@ -17,7 +17,7 @@ export SERVICE=${SERVICE_NAME}.${SERVICE_CLASS}@${SERVICE_VERSION}
 # check mandatory variables
 [[ -z "${LRS_DOMAIN}" ]] && \
     echo "Mandatory variable LRS_DOMAIN is not set. Add -e LRS_DOMAIN=lrsDomain to your arguments." && exit 1
-[[ -z "${LRS_AUTH}" ]] && \
+[[ -z "${LRS_AUTH_ADMIN}" ]] && \
     echo "Mandatory variable LRS_AUTH is not set. Add -e LRS_AUTH=lrsAuth to your arguments." && exit 1
 
 # configure service properties
@@ -25,7 +25,7 @@ function set_in_service_config {
     sed -i "s?${1}[[:blank:]]*=.*?${1}=${2}?g" ${SERVICE_PROPERTY_FILE}
 }
 set_in_service_config lrsDomain ${LRS_DOMAIN}
-set_in_service_config lrsAuth "${LRS_AUTH}"
+set_in_service_config lrsAuthAdmin "${LRS_AUTH_ADMIN}"
 
 
 # wait for any bootstrap host to be available
