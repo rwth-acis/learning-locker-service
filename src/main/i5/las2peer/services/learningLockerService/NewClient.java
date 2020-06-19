@@ -9,7 +9,7 @@ public class NewClient {
     private String title;
     private List<String> scopes;
 
-    public NewClient(String name, String lrs_id, String title,List<String> scopes) {
+    public NewClient(String name, String lrs_id, String title, List<String> scopes) {
 
         this.name = name;
         this.title = title;

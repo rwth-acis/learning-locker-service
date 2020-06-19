@@ -21,6 +21,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import i5.las2peer.api.ManualDeployment;
 import i5.las2peer.api.Service;
 import i5.las2peer.restMapper.annotations.ServicePath;
+import i5.las2peer.logging.L2pLogger;
+import java.util.logging.Level;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.Contact;
 import io.swagger.annotations.Info;
@@ -40,10 +42,10 @@ import net.minidev.json.JSONValue;
 						email = "philipp.roytburg@rwth-aachen.de")))
 
 /**
- * 
+ *
  * This service is for sending xAPI statements that are monitored through MobSOS to the defined Learning Locker
  * instance.
- * 
+ *
  */
 @ManualDeployment
 @ServicePath("/lrs")
@@ -55,13 +57,15 @@ public class LearningLockerService extends Service {
 	// private ArrayList<String> clientList = new ArrayList<>();
 	private final static String statementsEndpoint = "/data/xAPI/statements";
 	private final static String clientEndpoint = "/api/v2/client/";
+	private final static L2pLogger logger = L2pLogger.getInstance(LearningLockerService.class.getName());
 
 	public LearningLockerService() {
 		setFieldValues();
+		L2pLogger.setGlobalConsoleLevel(Level.WARNING);
 	}
 
 	/**
-	 * A function that is called by the user to send processed moodle to a mobsos data processing instance.
+	 * Upon a new mobsos data processing event the function sends the event data to the lrs.
 	 *
 	 * @param statements is an ArrayList of xAPI statements that are sent to the defined Learning Locker instance.
 	 * @throws IOException if any I/O Exception occurs.
@@ -74,6 +78,8 @@ public class LearningLockerService extends Service {
 
 			// Checks if the client exists
 			Object clientId = searchIfIncomingClientExists(token);
+
+			System.out.println("New Event using token " + token + ": " + xAPIStatement);
 
 			if (!(clientId).equals("newClient")) {
 				String clientKey = (String) ((JSONObject) clientId).get("basic_key");
@@ -88,6 +94,7 @@ public class LearningLockerService extends Service {
 			}
 
 			try {
+				System.out.println("lrsAuth:" + lrsAuth);
 				URL url = new URL(lrsDomain + statementsEndpoint);
 				HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 				conn.setDoOutput(true);
@@ -103,10 +110,14 @@ public class LearningLockerService extends Service {
 				os.write(xAPIStatement.getBytes("UTF-8"));
 				os.flush();
 
-				Reader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+				BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+				String line = "";
+				StringBuilder response = new StringBuilder();
 
-				for (int c; (c = reader.read()) >= 0;)
-					System.out.print((char) c);
+				while ((line = reader.readLine()) != null) {
+					response.append(line);
+				}
+				logger.info(response.toString());
 
 				conn.disconnect();
 			} catch (MalformedURLException e) {
@@ -138,14 +149,13 @@ public class LearningLockerService extends Service {
 			conn.setUseCaches(false);
 
 			BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-			System.out.println(reader);
-
 			String line = "";
 			StringBuilder response = new StringBuilder();
 
 			while ((line = reader.readLine()) != null) {
 				response.append(line);
 			}
+			logger.info(response.toString());
 			Object obj = JSONValue.parse(response.toString());
 			storeId = obj != null ? (String) ((JSONObject) obj).get("lrs_id") : "";
 
@@ -186,7 +196,7 @@ public class LearningLockerService extends Service {
 
 			for (int i = 0; i < ((JSONArray) obj).size(); i++) {
 				JSONObject client = (JSONObject) ((JSONArray) obj).get(i);
-				if (client.get("title").equals("Client" + moodleToken)) {
+				if (client.get("title").equals(moodleToken)) {
 					return client.get("api");
 				}
 			}
@@ -213,6 +223,8 @@ public class LearningLockerService extends Service {
 			conn.setRequestProperty("Cache-Control", "no-cache");
 			conn.setUseCaches(false);
 
+			System.out.println("Moodle Token:" + moodleToken);
+
 			String clientName = moodleToken;
 			String title = moodleToken;
 			List<String> scopes = new ArrayList<>();
@@ -223,6 +235,7 @@ public class LearningLockerService extends Service {
 			ObjectMapper mapper = new ObjectMapper();
 
 			String jsonString = mapper.writeValueAsString(newClient);
+			System.out.println("Cleint Object: " + jsonString);
 			OutputStream os = conn.getOutputStream();
 			os.write(jsonString.getBytes("UTF-8"));
 			os.flush();

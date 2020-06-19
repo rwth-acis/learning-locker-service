@@ -19,6 +19,8 @@ export SERVICE=${SERVICE_NAME}.${SERVICE_CLASS}@${SERVICE_VERSION}
     echo "Mandatory variable LRS_DOMAIN is not set. Add -e LRS_DOMAIN=lrsDomain to your arguments." && exit 1
 [[ -z "${LRS_AUTH_ADMIN}" ]] && \
     echo "Mandatory variable LRS_AUTH is not set. Add -e LRS_AUTH=lrsAuth to your arguments." && exit 1
+[[ -z "${LRS_CLIENT_ID}" ]] && \
+    echo "Mandatory variable LRS_AUTH is not set. Add -e LRS_AUTH=lrsAuth to your arguments." && exit 1
 
 # configure service properties
 function set_in_service_config {
@@ -26,6 +28,7 @@ function set_in_service_config {
 }
 set_in_service_config lrsDomain ${LRS_DOMAIN}
 set_in_service_config lrsAuthAdmin "${LRS_AUTH_ADMIN}"
+set_in_service_config lrsClientId "${LRS_CLIENT_ID}"
 
 
 # wait for any bootstrap host to be available
