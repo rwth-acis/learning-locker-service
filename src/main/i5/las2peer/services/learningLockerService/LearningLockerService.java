@@ -76,10 +76,10 @@ public class LearningLockerService extends Service {
 			String token = statement.split("\\*")[1];
 			String xAPIStatement = statement.split("\\*")[0];
 
+			logger.warning("New Event using token " + token + ": " + xAPIStatement);
+
 			// Checks if the client exists
 			Object clientId = searchIfIncomingClientExists(token);
-
-			System.out.println("New Event using token " + token + ": " + xAPIStatement);
 
 			if (!(clientId).equals("newClient")) {
 				String clientKey = (String) ((JSONObject) clientId).get("basic_key");
@@ -94,7 +94,7 @@ public class LearningLockerService extends Service {
 			}
 
 			try {
-				System.out.println("lrsAuth:" + lrsAuth);
+				logger.warning("Forwarding event using lrsAuth: " + lrsAuth);
 				URL url = new URL(lrsDomain + statementsEndpoint);
 				HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 				conn.setDoOutput(true);
@@ -223,7 +223,7 @@ public class LearningLockerService extends Service {
 			conn.setRequestProperty("Cache-Control", "no-cache");
 			conn.setUseCaches(false);
 
-			System.out.println("Moodle Token:" + moodleToken);
+			logger.warning("Creating new user with Moodle token: " + moodleToken);
 
 			String clientName = moodleToken;
 			String title = moodleToken;
@@ -235,7 +235,7 @@ public class LearningLockerService extends Service {
 			ObjectMapper mapper = new ObjectMapper();
 
 			String jsonString = mapper.writeValueAsString(newClient);
-			System.out.println("Cleint Object: " + jsonString);
+			logger.warning("Cleint Object: " + jsonString);
 			OutputStream os = conn.getOutputStream();
 			os.write(jsonString.getBytes("UTF-8"));
 			os.flush();
