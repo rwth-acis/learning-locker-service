@@ -30,6 +30,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
+import net.minidev.json.parser.ParseException;
 
 @Api
 @SwaggerDefinition(
@@ -262,5 +263,50 @@ public class LearningLockerService extends Service {
 			e.printStackTrace();
 		}
 		return "";
+	}
+	
+	public String getStatementsFromLRS(String token)  {
+		StringBuffer response = new StringBuffer();
+		String clientKey;
+		String clientSecret;
+		Object clientId = null;
+		try {
+			clientId = searchIfIncomingClientExists(token);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		if(!(clientId).equals("noClientExists")) {
+			clientKey = (String) ((JSONObject) clientId).get("basic_key");
+			clientSecret = (String) ((JSONObject) clientId).get("basic_secret");
+			String lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
+
+			try {
+				URL url = new URL(lrsDomain + "/data/xAPI/statements");
+				HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+				conn.setRequestMethod("GET");
+				conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+				conn.setRequestProperty("X-Experience-API-Version","1.0.3");
+				conn.setRequestProperty("Authorization", "Basic " + lrsAuth);
+				conn.setRequestProperty("Cache-Control", "no-cache");
+
+				BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+
+				String inputLine;
+
+				while ((inputLine = in.readLine()) != null) {
+					response.append(inputLine);
+				}
+				in.close();
+				conn.disconnect();
+			} catch (MalformedURLException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			return response.toString();
+		} else {
+			return "";
+		}
 	}
 }
