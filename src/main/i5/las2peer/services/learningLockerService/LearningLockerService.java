@@ -35,12 +35,12 @@ import net.minidev.json.parser.ParseException;
 @Api
 @SwaggerDefinition(
 		info = @Info(
-				title = "Moodle Data Proxy Service",
-				version = "1.0.0",
+				title = "Learning Locker Service",
+				version = "1.1.0",
 				description = "A proxy for requesting data from moodle",
 				contact = @Contact(
-						name = "Philipp Roytburg",
-						email = "philipp.roytburg@rwth-aachen.de")))
+						name = "Boris Jovanovic",
+						email = "jovanovic.boris@rwth-aachen.de")))
 
 /**
  *
