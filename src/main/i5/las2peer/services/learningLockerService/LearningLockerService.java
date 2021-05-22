@@ -30,6 +30,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
+import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
 
 @Api
@@ -76,7 +77,23 @@ public class LearningLockerService extends Service {
 		for (String statement : statements) {
 			String token = statement.split("\\*")[1];
 			String xAPIStatement = statement.split("\\*")[0];
-
+			
+			JSONParser parser = new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
+			JSONObject statementJSON = null;
+			try {
+				statementJSON = (JSONObject) parser.parse(xAPIStatement);
+			} catch (ParseException e1) {
+				logger.severe("Could not parse into JSON the given statement: " + xAPIStatement);
+				//return;
+			}
+			
+			// Check if statement has default store and remove it from final statement string
+			String defaultStore = null;
+			if (statementJSON != null) {
+				defaultStore = statementDefaultStoreProcessing(statementJSON);
+				xAPIStatement = statementJSON.toJSONString();
+			}
+			
 			logger.warning("New Event using token " + token + ": " + xAPIStatement);
 
 			// Checks if the client exists
@@ -87,8 +104,20 @@ public class LearningLockerService extends Service {
 				String clientSecret = (String) ((JSONObject) clientId).get("basic_secret");
 				lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
 			} else {
-				String storeId = getStoreIdOfAdmin();
-				Object newlyCreatedClient = createNewClient(token, storeId);
+				String storeID = null;
+				if (defaultStore != null) {
+					// If a default store is given, create a client in that store
+					storeID = defaultStore;
+				}
+				else {
+					// Otherwise create it in the store of the admin
+					storeID = getStoreIdOfAdmin();
+				}
+				Object newlyCreatedClient = createNewClient(token, storeID);
+				if (newlyCreatedClient == "") {
+					logger.severe("Store ID does not exist: " + storeID);
+					return;
+				}
 				String clientKey = (String) ((JSONObject) newlyCreatedClient).get("basic_key");
 				String clientSecret = (String) ((JSONObject) newlyCreatedClient).get("basic_secret");
 				lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
@@ -308,5 +337,17 @@ public class LearningLockerService extends Service {
 		} else {
 			return "";
 		}
+	}
+	
+	/**
+	 * Function that retrieves the default store value from a statement if it is present.
+	 * It then removes the key-value pair from the statement to make it valid for the LRS.
+	 * @param statement The statement to be processed.
+	 * @return The default store if present, otherwise null.
+	 */
+	private String statementDefaultStoreProcessing(JSONObject statement) {
+		String defaultStore = statement.getAsString("default_store");
+		statement.remove("default_store");
+		return defaultStore;
 	}
 }
