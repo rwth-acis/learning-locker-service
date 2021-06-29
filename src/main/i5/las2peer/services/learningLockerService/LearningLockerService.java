@@ -75,10 +75,18 @@ public class LearningLockerService extends Service {
 	public void sendXAPIstatement(ArrayList<String> statements) throws IOException {
 		String lrsAuth = "";
 		for (String statement : statements) {
-			String token = statement.split("\\*")[1];
-			String xAPIStatement = statement.split("\\*")[0];
-			
 			JSONParser parser = new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
+			JSONObject obj = null;
+			String token = "";
+			String xAPIStatement = "";
+			try {
+				obj = (JSONObject) parser.parse(statement);
+				token = obj.getAsString("token");
+				xAPIStatement = ((JSONObject) obj.get("statement")).toString();
+			} catch (ParseException e1) {
+				logger.severe("Could not parse into JSON the given statement: " + statement);
+			}
+
 			JSONObject statementJSON = null;
 			try {
 				statementJSON = (JSONObject) parser.parse(xAPIStatement);
@@ -86,7 +94,7 @@ public class LearningLockerService extends Service {
 				logger.severe("Could not parse into JSON the given statement: " + xAPIStatement);
 				//return;
 			}
-			
+
 			// Check if statement has default store and remove it from final statement string
 			String defaultStore = null;
 			if (statementJSON != null) {
