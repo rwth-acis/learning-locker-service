@@ -77,11 +77,11 @@ public class LearningLockerService extends Service {
 		for (String statement : statements) {
 			JSONParser parser = new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
 			JSONObject obj = null;
-			String token = "";
+			JSONArray tokens = null;
 			String xAPIStatement = "";
 			try {
 				obj = (JSONObject) parser.parse(statement);
-				token = obj.getAsString("token");
+				tokens = (JSONArray) obj.get("tokens");
 				xAPIStatement = ((JSONObject) obj.get("statement")).toString();
 			} catch (ParseException e1) {
 				logger.severe("Could not parse into JSON the given statement: " + statement);
@@ -101,67 +101,73 @@ public class LearningLockerService extends Service {
 				defaultStore = statementDefaultStoreProcessing(statementJSON);
 				xAPIStatement = statementJSON.toJSONString();
 			}
-			
-			logger.warning("New Event using token " + token + ": " + xAPIStatement);
 
-			// Checks if the client exists
-			Object clientId = searchIfIncomingClientExists(token);
+			if (tokens != null) {
+				for (int i = 0; i < tokens.size(); i++) {
+					String token = tokens.get(i).toString();
 
-			if (!(clientId).equals("newClient")) {
-				String clientKey = (String) ((JSONObject) clientId).get("basic_key");
-				String clientSecret = (String) ((JSONObject) clientId).get("basic_secret");
-				lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
-			} else {
-				String storeID = null;
-				if (defaultStore != null) {
-					// If a default store is given, create a client in that store
-					storeID = defaultStore;
+					logger.warning("New Event using token " + token + ": " + xAPIStatement);
+
+					// Checks if the client exists
+					Object clientId = searchIfIncomingClientExists(token);
+
+					if (!(clientId).equals("newClient")) {
+						String clientKey = (String) ((JSONObject) clientId).get("basic_key");
+						String clientSecret = (String) ((JSONObject) clientId).get("basic_secret");
+						lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
+					} else {
+						String storeID = null;
+						if (defaultStore != null) {
+							// If a default store is given, create a client in that store
+							storeID = defaultStore;
+						}
+						else {
+							// Otherwise create it in the store of the admin
+							storeID = getStoreIdOfAdmin();
+						}
+						Object newlyCreatedClient = createNewClient(token, storeID);
+						if (newlyCreatedClient == "") {
+							logger.severe("Store ID does not exist: " + storeID);
+							return;
+						}
+						String clientKey = (String) ((JSONObject) newlyCreatedClient).get("basic_key");
+						String clientSecret = (String) ((JSONObject) newlyCreatedClient).get("basic_secret");
+						lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
+					}
+
+					try {
+						logger.warning("Forwarding event using lrsAuth: " + lrsAuth);
+						URL url = new URL(lrsDomain + statementsEndpoint);
+						HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+						conn.setDoOutput(true);
+						conn.setDoInput(true);
+						conn.setRequestMethod("POST");
+						conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+						conn.setRequestProperty("X-Experience-API-Version", "1.0.3");
+						conn.setRequestProperty("Authorization", "Basic " + lrsAuth);
+						conn.setRequestProperty("Cache-Control", "no-cache");
+						conn.setUseCaches(false);
+
+						OutputStream os = conn.getOutputStream();
+						os.write(xAPIStatement.getBytes("UTF-8"));
+						os.flush();
+
+						BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+						String line = "";
+						StringBuilder response = new StringBuilder();
+
+						while ((line = reader.readLine()) != null) {
+							response.append(line);
+						}
+						logger.info(response.toString());
+
+						conn.disconnect();
+					} catch (MalformedURLException e) {
+						e.printStackTrace();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
-				else {
-					// Otherwise create it in the store of the admin
-					storeID = getStoreIdOfAdmin();
-				}
-				Object newlyCreatedClient = createNewClient(token, storeID);
-				if (newlyCreatedClient == "") {
-					logger.severe("Store ID does not exist: " + storeID);
-					return;
-				}
-				String clientKey = (String) ((JSONObject) newlyCreatedClient).get("basic_key");
-				String clientSecret = (String) ((JSONObject) newlyCreatedClient).get("basic_secret");
-				lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
-			}
-
-			try {
-				logger.warning("Forwarding event using lrsAuth: " + lrsAuth);
-				URL url = new URL(lrsDomain + statementsEndpoint);
-				HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-				conn.setDoOutput(true);
-				conn.setDoInput(true);
-				conn.setRequestMethod("POST");
-				conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-				conn.setRequestProperty("X-Experience-API-Version", "1.0.3");
-				conn.setRequestProperty("Authorization", "Basic " + lrsAuth);
-				conn.setRequestProperty("Cache-Control", "no-cache");
-				conn.setUseCaches(false);
-
-				OutputStream os = conn.getOutputStream();
-				os.write(xAPIStatement.getBytes("UTF-8"));
-				os.flush();
-
-				BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-				String line = "";
-				StringBuilder response = new StringBuilder();
-
-				while ((line = reader.readLine()) != null) {
-					response.append(line);
-				}
-				logger.info(response.toString());
-
-				conn.disconnect();
-			} catch (MalformedURLException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
 			}
 		}
 	}
