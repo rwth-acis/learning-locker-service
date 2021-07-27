@@ -30,6 +30,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
+import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
 
 @Api
@@ -74,57 +75,99 @@ public class LearningLockerService extends Service {
 	public void sendXAPIstatement(ArrayList<String> statements) throws IOException {
 		String lrsAuth = "";
 		for (String statement : statements) {
-			String token = statement.split("\\*")[1];
-			String xAPIStatement = statement.split("\\*")[0];
-
-			logger.warning("New Event using token " + token + ": " + xAPIStatement);
-
-			// Checks if the client exists
-			Object clientId = searchIfIncomingClientExists(token);
-
-			if (!(clientId).equals("newClient")) {
-				String clientKey = (String) ((JSONObject) clientId).get("basic_key");
-				String clientSecret = (String) ((JSONObject) clientId).get("basic_secret");
-				lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
-			} else {
-				String storeId = getStoreIdOfAdmin();
-				Object newlyCreatedClient = createNewClient(token, storeId);
-				String clientKey = (String) ((JSONObject) newlyCreatedClient).get("basic_key");
-				String clientSecret = (String) ((JSONObject) newlyCreatedClient).get("basic_secret");
-				lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
+			JSONParser parser = new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
+			JSONObject obj = null;
+			JSONArray tokens = null;
+			String xAPIStatement = "";
+			try {
+				obj = (JSONObject) parser.parse(statement);
+				tokens = (JSONArray) obj.get("tokens");
+				xAPIStatement = ((JSONObject) obj.get("statement")).toString();
+			} catch (ParseException e1) {
+				logger.severe("Could not parse into JSON the given statement: " + statement);
 			}
 
+			JSONObject statementJSON = null;
 			try {
-				logger.warning("Forwarding event using lrsAuth: " + lrsAuth);
-				URL url = new URL(lrsDomain + statementsEndpoint);
-				HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-				conn.setDoOutput(true);
-				conn.setDoInput(true);
-				conn.setRequestMethod("POST");
-				conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-				conn.setRequestProperty("X-Experience-API-Version", "1.0.3");
-				conn.setRequestProperty("Authorization", "Basic " + lrsAuth);
-				conn.setRequestProperty("Cache-Control", "no-cache");
-				conn.setUseCaches(false);
+				statementJSON = (JSONObject) parser.parse(xAPIStatement);
+			} catch (ParseException e1) {
+				logger.severe("Could not parse into JSON the given statement: " + xAPIStatement);
+				//return;
+			}
 
-				OutputStream os = conn.getOutputStream();
-				os.write(xAPIStatement.getBytes("UTF-8"));
-				os.flush();
+			// Check if statement has default store and remove it from final statement string
+			String defaultStore = null;
+			if (statementJSON != null) {
+				defaultStore = statementDefaultStoreProcessing(statementJSON);
+				xAPIStatement = statementJSON.toJSONString();
+			}
 
-				BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-				String line = "";
-				StringBuilder response = new StringBuilder();
+			if (tokens != null) {
+				for (int i = 0; i < tokens.size(); i++) {
+					String token = tokens.get(i).toString();
 
-				while ((line = reader.readLine()) != null) {
-					response.append(line);
+					logger.warning("New Event using token " + token + ": " + xAPIStatement);
+
+					// Checks if the client exists
+					Object clientId = searchIfIncomingClientExists(token);
+
+					if (!(clientId).equals("newClient")) {
+						String clientKey = (String) ((JSONObject) clientId).get("basic_key");
+						String clientSecret = (String) ((JSONObject) clientId).get("basic_secret");
+						lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
+					} else {
+						String storeID = null;
+						if (defaultStore != null) {
+							// If a default store is given, create a client in that store
+							storeID = defaultStore;
+						}
+						else {
+							// Otherwise create it in the store of the admin
+							storeID = getStoreIdOfAdmin();
+						}
+						Object newlyCreatedClient = createNewClient(token, storeID);
+						if (newlyCreatedClient == "") {
+							logger.severe("Store ID does not exist: " + storeID);
+							return;
+						}
+						String clientKey = (String) ((JSONObject) newlyCreatedClient).get("basic_key");
+						String clientSecret = (String) ((JSONObject) newlyCreatedClient).get("basic_secret");
+						lrsAuth = Base64.getEncoder().encodeToString((clientKey + ":" + clientSecret).getBytes());
+					}
+
+					try {
+						logger.warning("Forwarding event using lrsAuth: " + lrsAuth);
+						URL url = new URL(lrsDomain + statementsEndpoint);
+						HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+						conn.setDoOutput(true);
+						conn.setDoInput(true);
+						conn.setRequestMethod("POST");
+						conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+						conn.setRequestProperty("X-Experience-API-Version", "1.0.3");
+						conn.setRequestProperty("Authorization", "Basic " + lrsAuth);
+						conn.setRequestProperty("Cache-Control", "no-cache");
+						conn.setUseCaches(false);
+
+						OutputStream os = conn.getOutputStream();
+						os.write(xAPIStatement.getBytes("UTF-8"));
+						os.flush();
+
+						BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+						String line = "";
+						StringBuilder response = new StringBuilder();
+
+						while ((line = reader.readLine()) != null) {
+							response.append(line);
+						}
+						logger.info(response.toString());
+
+						conn.disconnect();
+					} catch (MalformedURLException e) {
+						e.printStackTrace();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
-				logger.info(response.toString());
-
-				conn.disconnect();
-			} catch (MalformedURLException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
 			}
 		}
 	}
@@ -308,5 +351,17 @@ public class LearningLockerService extends Service {
 		} else {
 			return "";
 		}
+	}
+	
+	/**
+	 * Function that retrieves the default store value from a statement if it is present.
+	 * It then removes the key-value pair from the statement to make it valid for the LRS.
+	 * @param statement The statement to be processed.
+	 * @return The default store if present, otherwise null.
+	 */
+	private String statementDefaultStoreProcessing(JSONObject statement) {
+		String defaultStore = statement.getAsString("default_store");
+		statement.remove("default_store");
+		return defaultStore;
 	}
 }
