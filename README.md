@@ -26,7 +26,7 @@ Build
 Execute the following command on your shell:
 
 ```shell
-ant jar 
+./gradlew build 
 ```
 
 Start
