@@ -240,7 +240,7 @@ public class LearningLockerService extends Service {
 
 			for (int i = 0; i < ((JSONArray) obj).size(); i++) {
 				JSONObject client = (JSONObject) ((JSONArray) obj).get(i);
-				if (client.get("title").equals(moodleToken)) {
+				if (client.get("title") != null && client.get("title").equals(moodleToken)) {
 					return client.get("api");
 				}
 			}
@@ -279,7 +279,7 @@ public class LearningLockerService extends Service {
 			ObjectMapper mapper = new ObjectMapper();
 
 			String jsonString = mapper.writeValueAsString(newClient);
-			logger.warning("Cleint Object: " + jsonString);
+			logger.warning("Client Object: " + jsonString);
 			OutputStream os = conn.getOutputStream();
 			os.write(jsonString.getBytes("UTF-8"));
 			os.flush();
